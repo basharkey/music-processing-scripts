@@ -1,5 +1,5 @@
 # music-processing-scripts
-Scripts for processing my personal music library
+Scripts for processing my music library
 
 ## Dependencies
 - ffmpeg (specifically for ffprobe)

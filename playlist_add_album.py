@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import json
-from process_album import get_music_metadata
+import process_album
 
 def relative(target: Path, origin: Path) -> Path:
     target = target.resolve()
@@ -25,7 +25,7 @@ def generate_m3u8_entry(music_file: Path, playlist_file: Path) -> tuple[str, str
                     if stream['codec_type'] == 'audio':
                         audio_stream = stream
                 track_duration = round(float(audio_stream['duration']))
-                track_artist, track_album, track_title = get_music_metadata(music_file)
+                track_artist, track_album, track_title = process_album.get_music_metadata(music_file)
                 track_relative_path = relative(music_file, playlist_file.parent)
 
                 return f'#EXTINF:{track_duration},{track_title}', f'{track_relative_path}'
@@ -62,11 +62,11 @@ def main():
 
     music_file_types = ['.flac', '.mp3', '.m4a', '.ogg']
 
-    for file in Path(args.album_dir).iterdir():
+    for file in sorted(Path(args.album_dir).iterdir()):
         if file.is_file() and file.suffix in music_file_types:
             for playlist in args.playlist:
                 try:
-                    add_track_to_playlist(file, playlist)
+                    add_track_to_playlist(file, Path(playlist))
                 except Exception as e:
                     print(e)
                     print(f"Error: Unable to add song \"{music_file}\" to playlist \"{playlist}\"")

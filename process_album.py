@@ -216,7 +216,7 @@ def main():
 
     if args.playlists:
         for playlist in args.playlists:
-            for music_file in music_album_dir.iterdir():
+            for music_file in sorted(music_album_dir.iterdir()):
                 if music_file.is_file() and music_file.suffix in music_file_types:
                     try:
                         playlist_add_album.add_track_to_playlist(music_file, Path(playlist).expanduser().resolve())

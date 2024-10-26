@@ -1,0 +1,5 @@
+archive_dir: ~/Documents/music-archive
+music_dir: ~/Documents/Music/artists
+
+playlists:
+  ~/Music/playlists/Main.m3u8

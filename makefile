@@ -7,3 +7,5 @@ install:
 	curl -s -L $(rsgain_release) -o $(tmp_file)
 	sudo dpkg --install $(tmp_file)
 	rm $(tmp_file)
+
+	sudo cp *.py /usr/local/bin

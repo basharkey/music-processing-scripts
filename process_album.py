@@ -21,8 +21,7 @@ def load_config(config_name: str) -> dict:
             config = yaml.safe_load(c)
             if config:
                 return config
-            else:
-                return {}
+    return {}
 
 def validate_config(config: dict):
     keys = {
@@ -124,7 +123,7 @@ def process_album_replay_gain(album_dir: Path):
     subprocess.check_output(['rsgain', 'easy', album_dir])
 
 def main():
-    prog = 'process-album'
+    prog = 'process_album'
 
     try:
         config = load_config(prog)
@@ -186,8 +185,8 @@ def main():
         album_name = args.album
 
     # Prepare dirs
-    archive_artist_dir = Path(args.archive_dir, artist_name)
-    music_artist_dir = Path(args.music_dir, artist_name)
+    archive_artist_dir = Path(args.archive_dir).joinpath(artist_name).expanduser().resolve()
+    music_artist_dir = Path(args.music_dir).joinpath(artist_name).expanduser().resolve()
     archive_artist_dir.mkdir(parents=True, exist_ok=True)
     music_artist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -215,14 +214,15 @@ def main():
             raise SystemExit(f"Error: Could not copy album to \"{msic_album_dir}\"")
         process_album_replay_gain(music_album_dir)
 
-    for playlist in args.playlists:
-        for music_file in music_album_dir.iterdir():
-            if music_file.is_file() and music_file.suffix in music_file_types:
-                try:
-                    playlist_add_album.add_track_to_playlist(music_file, playlist)
-                except Exception as e:
-                    print(e)
-                    print(f"Error: Unable to add song \"{music_file}\" to playlist \"{playlist}\"")
+    if args.playlists:
+        for playlist in args.playlists:
+            for music_file in music_album_dir.iterdir():
+                if music_file.is_file() and music_file.suffix in music_file_types:
+                    try:
+                        playlist_add_album.add_track_to_playlist(music_file, Path(playlist).expanduser().resolve())
+                    except Exception as e:
+                        print(e)
+                        print(f"Error: Unable to add song \"{music_file}\" to playlist \"{playlist}\"")
 
 if __name__ == '__main__':
     main()

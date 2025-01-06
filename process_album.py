@@ -137,9 +137,9 @@ def main():
         music_file_types = ['.flac', '.mp3', '.m4a', '.ogg']
 
     description = "Copy/archive album, process ReplayGain, and add them to playlist."
-    usage = """%(prog)s [-h] -g [ARCHIVE_DIR] -m [MUSIC_DIR]
-                     (-b | -a [ARTIST] -n [ALBUM])
-                     (-z [ZIP] | -d [ALBUM_DIR])"""
+    usage = """%(prog)s [-h] [-g ARCHIVE_DIR] [-m MUSIC_DIR] [-p PLAYLIST]
+                     (-b | -a ARTIST -n ALBUM)
+                     (-z ZIP | -d ALBUM_DIR)"""
     epilog = "Arguments override options set in configuration file."
     parser = argparse.ArgumentParser(prog=prog, description=description, usage=usage, epilog=epilog)
     parser.add_argument('-b', '--auto-detect', action='store_true')

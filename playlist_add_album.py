@@ -25,7 +25,7 @@ def generate_m3u8_entry(music_file: Path, playlist_file: Path) -> tuple[str, str
                     if stream['codec_type'] == 'audio':
                         audio_stream = stream
                 track_duration = round(float(audio_stream['duration']))
-                track_artist, track_album, track_title = process_album.get_music_metadata(music_file)
+                track_title = process_album.get_music_metadata(music_file, ['title'])['title']
                 track_relative_path = relative(music_file, playlist_file.parent)
 
                 return f'#EXTINF:{track_duration},{track_title}', f'{track_relative_path}'

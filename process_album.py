@@ -43,18 +43,22 @@ def yes_no(prompt: bool) -> bool:
         return True
     return False
 
-def get_music_files(dir: Path, music_file_types: list[str]) -> list[Path]:
+def get_music_files(path: Path, music_file_types: list[str]) -> list[Path]:
     music_files = []
-    for file in Path(dir).iterdir():
-        if file.is_file() and file.suffix in music_file_types:
-            music_files.append(file)
-    
-    for file in Path(dir).iterdir():
-        if file.is_dir():
-            music_files = music_files + get_music_files(file, music_file_types)
+
+    if path.is_file():
+        music_files.append(path)
+    else:
+        for file in Path(path).iterdir():
+            if file.is_file() and file.suffix in music_file_types:
+                music_files.append(file)
+
+        for file in Path(path).iterdir():
+            if file.is_dir():
+                music_files = music_files + get_music_files(file, music_file_types)
     return music_files
 
-def get_music_metadata(music_file: Path) -> tuple[str, str, str]:
+def get_music_metadata(music_file: Path, requested_tags: list[str]=['artist','title','album']) -> dict[str]:
     try:
         metadata = subprocess.check_output(['ffprobe',
                                             '-v', 'quiet',
@@ -65,29 +69,17 @@ def get_music_metadata(music_file: Path) -> tuple[str, str, str]:
             metadata = json.loads(metadata)
             try:
                 tags = metadata['format']['tags']
+                gathered_tags = {}
 
-                if 'ARTIST' in tags:
-                    track_artist = tags['ARTIST']
-                elif 'artist' in tags:
-                    track_artist = tags['artist']
-                else:
-                    raise KeyError('artist')
+                for requested_tag in requested_tags:
+                    if requested_tag.upper() in tags:
+                        gathered_tags[requested_tag] = tags[requested_tag.upper()]
+                    elif requested_tag.lower() in tags:
+                        gathered_tags[requested_tag] = tags[requested_tag.lower()]
+                    else:
+                        raise KeyError(requested_tag)
 
-                if 'ALBUM' in tags:
-                    track_album = tags['ALBUM']
-                elif 'album' in tags:
-                    track_album = tags['album']
-                else:
-                    raise KeyError('album')
-
-                if 'TITLE' in tags:
-                    track_title = tags['TITLE']
-                elif 'title' in tags:
-                    track_title = tags['title']
-                else:
-                    raise KeyError('title')
-
-                return track_artist, track_album, track_title
+                return gathered_tags
             except KeyError as e:
                 raise Exception(f"Error: Tag {e} not found in \"{music_file}\"")
         except json.JSONDecodeError as e:
@@ -95,10 +87,13 @@ def get_music_metadata(music_file: Path) -> tuple[str, str, str]:
     except subprocess.CalledProcessError as e:
         raise Exception(f"Error: ffprobe error for \"{music_file}\" {e}")
 
-def auto_detect(dir: Path, music_file_types: list[str]) -> tuple[str, str]:
-    music_files = get_music_files(dir, music_file_types)
+def auto_detect(path: Path, music_file_types: list[str], single: bool=False) -> tuple[str, str]:
+    music_files = get_music_files(path, music_file_types)
     for music_file in music_files:
-        return get_music_metadata(music_file)[:-1]
+        if single:
+            return get_music_metadata(music_file, ['artist', 'title'])
+        else:
+            return get_music_metadata(music_file)
 
 def get_root_album_dir(dir: Path, music_file_types: list[str], root=True) -> Path | None:
     '''
@@ -139,18 +134,19 @@ def main():
     description = "Copy/archive album, process ReplayGain, and add them to playlist."
     usage = """%(prog)s [-h] [-g ARCHIVE_DIR] [-m MUSIC_DIR] [-p PLAYLIST]
                      (-b | -a ARTIST -n ALBUM)
-                     (-z ZIP | -d ALBUM_DIR)"""
+                     (-z ZIP | -d ALBUM_DIR | -s SINGLE)"""
     epilog = "Arguments override options set in configuration file."
     parser = argparse.ArgumentParser(prog=prog, description=description, usage=usage, epilog=epilog)
     parser.add_argument('-b', '--auto-detect', action='store_true')
-    parser.add_argument('-a', '--artist')
-    parser.add_argument('-n', '--album')
-    parser.add_argument('-g', '--archive-dir', required=False if 'archive_dir' in config else True)
-    parser.add_argument('-m', '--music-dir', required=False if 'music_dir' in config else True)
-    parser.add_argument('-p', '--playlists', action='append')
+    parser.add_argument('-a', '--artist', type=str)
+    parser.add_argument('-n', '--album', type=str)
+    parser.add_argument('-g', '--archive-dir', type=Path, required=False if 'archive_dir' in config else True)
+    parser.add_argument('-m', '--music-dir', type=Path, required=False if 'music_dir' in config else True)
+    parser.add_argument('-p', '--playlists', type=Path, action='append')
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-z', '--zip')
-    group.add_argument('-d', '--album-dir')
+    group.add_argument('-z', '--zip', type=Path)
+    group.add_argument('-d', '--album-dir', type=Path)
+    group.add_argument('-s', '--single', type=Path)
     args = parser.parse_args()
 
     if not args.auto_detect and (not args.artist or not args.album):
@@ -164,25 +160,38 @@ def main():
         if type(getattr(args, config_arg, None)) == str and getattr(args, config_arg, None) == '' :
             raise SystemExit(f"Error: '{config_arg}' set to blank string ''")
 
+    if not args.auto_detect:
+        artist_name = args.artist
+        album_name = args.album
+
     if args.zip != None:
         tmp_dir = tempfile.TemporaryDirectory()
         with zipfile.ZipFile(args.zip, 'r', metadata_encoding= 'utf-8') as z:
             z.extractall(tmp_dir.name)
 
         album_dir = get_root_album_dir(Path(tmp_dir.name), music_file_types)
-
         if args.auto_detect:
-            artist_name, album_name = auto_detect(Path(tmp_dir.name), music_file_types)
+            metadata = auto_detect(Path(tmp_dir.name), music_file_types)
+            artist_name = metadata['artist']
+            album_name = metadata['album']
 
     elif args.album_dir != None:
-        album_dir = get_root_album_dir(Path(args.album_dir), music_file_types)
-
+        album_dir = get_root_album_dir(args.album_dir, music_file_types)
         if args.auto_detect:
-            artist_name, album_name = auto_detect(Path(args.album_dir), music_file_types)
+            metadata = auto_detect(args.album_dir, music_file_types)
+            artist_name = metadata['artist']
+            album_name = metadata['album']
 
-    if not args.auto_detect:
-        artist_name = args.artist
-        album_name = args.album
+    elif args.single != None:
+        if args.auto_detect:
+            metadata = auto_detect(args.single, music_file_types, True)
+            artist_name = metadata['artist']
+            album_name = metadata['title']
+
+        tmp_dir = tempfile.TemporaryDirectory()
+        album_dir = Path(tmp_dir.name).joinpath(album_name)
+        album_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(args.single, album_dir)
 
     # Prepare dirs
     archive_artist_dir = Path(args.archive_dir).joinpath(artist_name).expanduser().resolve()

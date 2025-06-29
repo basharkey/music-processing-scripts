@@ -9,3 +9,6 @@ install:
 	rm $(tmp_file)
 
 	sudo cp *.py /usr/local/bin
+
+update:
+	sudo cp *.py /usr/local/bin
